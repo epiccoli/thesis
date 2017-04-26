@@ -64,7 +64,7 @@ important_spec_ei = ei[real_idx]
 # print important_spec_ei
 important_spec_idx = np.asarray(important_spec_idx)
 
-
+ 
 for i in range(len(real_idx)):
     
     print gas.species_name(real_idx[i])
