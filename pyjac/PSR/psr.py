@@ -10,19 +10,22 @@ import matplotlib.pyplot as plt
 import time as t
 import pdb
  
+def stats(vector,keys):
+
+	max_val = np.amax(vector)
+	max_idx = np.argmax(vector)
+
+	print "Max value: ", max_val, " at position ", max_idx, " -> ", keys[max_idx]
 
 
-
-# Set phase conditions
+# Gas properties
 phi = 1.0
 P = 101325
-Temperatures = [1400]
+T = 1400
 
-T=Temperatures[0]
-
-# Set simulation conditions
+# Simulation conditions
 npoints = 1000
-timestep = 1e-4*1.5e-3
+timestep = 1.5e-7
 
 # Create gas object
 gas = ct.Solution('Skeletal29_N.cti')
@@ -35,6 +38,19 @@ gas = ct.Solution(thermo='IdealGas', kinetics='GasKinetics',
         reactions=gas.reactions())
 # print gas.species_name(28) # >> should give N2
 
+
+
+EI_keys = ['']*gas.n_species
+
+EI_keys[0] = 'T'
+for i in range(1,gas.n_species):
+	EI_keys[i] = gas.species_name(i-1)
+	print gas.species_name(i)
+print EI_keys	
+
+track_entries = ['H', 'OH', 'CH', 'HO2', 'HCO', 'H2O2', 'CH3', 'O2', 'C']
+idx_entries = [1, 4, 19, 8, 20, 6, 10, 5, 18]
+# prova manuale : H (entry 1)
 
 ## SET EQUIVALENCE RATIO TO phi, temperature and pressure
 gas.set_equivalence_ratio(phi,'C2H4','O2:1, N2:3.76')
@@ -60,9 +76,16 @@ enth = np.zeros(npoints,'d')
 # with open('xmgrace.txt','w') as file1:
 file1 = open('xmgrace.txt','w')
 
+CEMA_interval = 1 # only divisors of npoints
+data_length = int(npoints/CEMA_interval)
+N_eig = 2
 val=[]
 tt=[]
+ei_sp=[]
 
+eigenvalues = np.zeros((N_eig,data_length))
+
+count=0
 
 start = t.time()
 for n in range(npoints):
@@ -72,10 +95,20 @@ for n in range(npoints):
 	tim[n] = time
 	temp[n]= r.T
 
-	if n % 1 == 0:
+	if n % CEMA_interval == 0:
 		D, L, R = solve_eig_gas(gas)
-		val.append(D[np.argmax(D)])
+		max_idx = np.argmax(D)
+		val.append(D[max_idx])
 		tt.append(time)
+
+		eigenvalues[:,count] = D[np.argsort(D)[-N_eig:]]		# matrix with N_eig lines
+		print D[np.argsort(D)[-N_eig:]]
+
+		expl_indices = EI(D,L,R,max_idx)
+		ei_sp.append(expl_indices[18])
+		stats(expl_indices,EI_keys)
+		
+		count += 1
 
 		
 		
@@ -85,10 +118,10 @@ for n in range(npoints):
 
 # TAI = findAIT(gas,timestep,npoints)
 # gas = gas_cp
-# eigv, tt = PSR_eig(gas,timestep,npoints,TAI)
-end = t.time()
-# pdb.set_trace()
 
+end = t.time()
+# 
+print len(val)
 print end-start, ' seconds'	
 
 
@@ -100,18 +133,27 @@ dTdt = dT/np.diff(tim)
 file1.close()
 
 plt.figure(figsize=(10,5))
-plt.subplot(3,1,1)
+plt.subplot(4,1,1)
 plt.plot(tim,temp)
 plt.title('Temp')
 
-plt.subplot(3,1,2)
+plt.subplot(4,1,2)
 plt.plot(tt,np.array(val)/1e6)
 plt.title('Eig')
 
-plt.subplot(3,1,3)
+plt.subplot(4,1,3)
 plt.plot(np.arange(0,len(dT)),dT)
 plt.title('Temperature gradient')
 
+plt.subplot(4,1,4)
+plt.plot(np.arange(0,len(ei_sp)),ei_sp)
+
+plt.show()
+
+plt.figure()
+
+for i in range(N_eig):
+	plt.plot(tt,np.log10(eigenvalues[i,:]+1))
 
 plt.show()
 
@@ -119,7 +161,4 @@ plt.show()
 print 'maximum heat release rate at time ', tim[np.argmax(np.diff(temp))]
 print max(val), 'is max eigenvalue at time ', tt[val.index(max(val))]
 
-# neg_eig = val[np.where(val<0)]
-neg_idx = np.where(np.array(val)<0)
 
-print tt[np.asint(neg_idx[0]).astype(np.int64)]
