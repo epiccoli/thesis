@@ -1,24 +1,18 @@
 import pdb
 import sys
-sys.path.append('../functions/.')
+sys.path.append('../functions/')
 from CEMA import *
 
 import pyjacob
 
-# import py_eval_jacobian 
 import cantera as ct
 import numpy as np
 import timeit
-
+import matplotlib.pyplot as plt
 import scipy.linalg as LA 
-
-
-
 
 #create gas from original mechanism file gri30.cti
 gas = ct.Solution('Skeletal29_N.cti')
-
-
 
 #set the gas state
 P = 101325 # Pa
@@ -37,9 +31,7 @@ gas.TP = T,P
 #         species=specs[:n2_ind] + specs[n2_ind + 1:] + [specs[n2_ind]],
 #         reactions=gas.reactions())
 
-
-
-# Flame object
+# 1D flame simulation
 width = 0.03
 initial_grid = np.linspace(0,width, 7) # coarse first
 f = ct.FreeFlame(gas, grid=initial_grid)
@@ -47,88 +39,45 @@ f.set_refine_criteria(ratio=2, slope=0.05, curve=0.1)
 
 f.solve(loglevel=0, auto=True)
 # print('\nmixture-averaged flamespeed = {:7f} m/s\n'.format(f.u[0]))
-eigenvals, ind = flame_eig(f,gas)
 
-# print ind
+# Chemical explosive mode analysis for 1D flame
+eigenvalues, global_expl_indices, track_species = solve_eig_flame(f,gas)
 
-for loc in range(len(f.grid)):
-
-	# solve eig PB for specific x location in flame, return D, l, r
-	D, L, R = solve_eig_flame(f,loc)
-
-	# find maximum EI species involved
+spec_dictionary = get_species_names(track_species,gas)
 
 
 
-# D,l,r = EigPbJac(gas)
+manual_spec = ['CH', 'OH', 'H', 'HCO', 'H2O2']
+manual_spec = ['CO', 'HCO', 'O', 'O2', 'C']
 
-pdb.set_trace()
+# TO SEE WHICH SPECIES ARE IN DICTIONARY OF MOST EXPLOSIVE SPECIES
+# print spec_dictionary
 
-# print D
+## EIG FIGURE ## 
 
-
-real_lambda = D.real
-max_eig_idx = np.argmax(real_lambda)
-print max_eig_idx, ' maximum eigenvalue position'
-
-# print max eigenvector
-# print l[max_eig_idx,:]
+plt.figure()
+plt.plot(f.grid,np.log10(eigenvalues[0,:]+1),'--')
 
 pdb.set_trace()
+# for i in range(len(eigenvalues[:,0])):
+# 	plt.plot(f.grid,np.log10(eigenvalues[i,:]+1),'--')
 
-ei = EI(D,l,r,max_eig_idx)
+plt.show()
 
-important_spec_idx = np.where(ei>1e-3) 
-print important_spec_idx[0], " important species index"
+plt.figure()
+plt.subplot(2,1,1)
+for spec in spec_dictionary:
 
-real_idx = important_spec_idx[0] - 1
-print real_idx, " real index of species (-1 for T)"
+	if spec in manual_spec:
+		plt.plot(f.grid,global_expl_indices[spec_dictionary[spec],:],label=spec)
+plt.legend()
+plt.title('Explosive index for selected species along 1D flame domain')
 
-important_spec_ei = ei[real_idx]
-# print important_spec_idx
-# print important_spec_ei
-important_spec_idx = np.asarray(important_spec_idx)
-
- 
-for i in range(len(real_idx)):
-    
-    print gas.species_name(real_idx[i])
-
-
-## display species order in gas object
-# specs = gas.species()[:]
-
-# for s in specs:
-# 	print s
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+plt.subplot(2,1,2)
+for spec in manual_spec:
+	y_spec = f.Y[gas.species_index(spec),:]
+	plt.semilogy(f.grid,y_spec, label=spec)
+plt.legend()	
+plt.title('Species mass fraction along 1D flame domain')
+plt.show()
 
