@@ -2,8 +2,10 @@ import numpy as np
 import pyjacob
 import scipy.linalg as LA
 import cantera as ct
+import pdb
 
-def EigPbJac(gas):
+
+def solve_eig_gas(gas):
 
 
     # input arg: gas cantera object
@@ -32,8 +34,10 @@ def EigPbJac(gas):
 
     # Solve eigenvalue PB > D: eigenvalues
     D, vl, vr = LA.eig(jac, left = True)
+    D=D.real
 
     return D, vl, vr
+
 
 def EI(D,l,r,k):
 
@@ -59,50 +63,6 @@ def EI(D,l,r,k):
 
 # def PI()
 
-def first_second_eig(gas):
-
-    # input arg: gas cantera object
-    # output arg: max chemical eigenvalue
-
-    T = gas.T
-    P = gas.P
-    
-    # #setup the state vector
-    y = np.zeros(gas.n_species)
-    y[0] = T
-    y[1:] = gas.Y[:-1]
-    
-    # #create a dydt vector
-    dydt = np.zeros_like(y)
-    pyjacob.py_dydt(0, P, y, dydt)
-
-    #create a jacobian vector
-    jac = np.zeros(gas.n_species * gas.n_species)
-
-
-    #evaluate the Jacobian
-    pyjacob.py_eval_jacobian(0, P, y, jac)
-
-    jac = jac.reshape(gas.n_species,gas.n_species)
-
-    # Solve eigenvalue PB > D: eigenvalues
-    D, W, V = LA.eig(jac, left = True)
-
-    # FINDS HIGHEST EIGENVALUE FOR EACH POINT
-    # Take only real part into account
-    D = D.real
-    max_val = -1e7
-    for i in range(len(D)):
-        if D[i] > max_val:
-            # print D[i], gas.species_name(i)
-            max_val = D[i]
-            species_idx = i
-            print species_idx
-
-    for i in range(len(D)):
-        print D[i]
-
-    return max_val
 
 def find_max_eigenvalue(gas):
 
@@ -146,45 +106,120 @@ def find_max_eigenvalue(gas):
 
     return max_val
 
-def flame_eig(f,gas):
+
+def solve_eig_flame(f,gas):
+    N_eig = 2 # selects number of eigenvalues to store for each flame location
+    N_EI = 1 # number of EI species to track 
+
     T = f.T # 1D array with temperatures
     Y = f.Y # matrix array with lines corresponding to the 29 species, columns corresponding to the grid points
     P = f.P # single value
-    eigenvalues = np.zeros(len(f.grid))
+
+    n_species = gas.n_species 
+    grid_pts = len(f.grid)
+
+    eigenvalues = np.zeros([N_eig, grid_pts])
     
-    for loc in range(len(f.grid)):
-        y=np.zeros(gas.n_species)
+    track_specs=[]      # initialised as list, then converts to np.array when using np.union1d
+    global_expl_indices = np.zeros([n_species, grid_pts])
+    
+    # iterate over x-span of 1D flame domain
+    for loc in range(grid_pts):
+        y=np.zeros(n_species)
         y[0] = T[loc]
-        y[1:] = Y[1:,loc]
         # find the position of N2 species
-        # N2_idx = gas.species_index('N2')    
+        N2_idx = gas.species_index('N2')   
+        y_massfr = np.concatenate([Y[0:N2_idx,loc], Y[N2_idx+1:,loc]])
+        y[1:] = y_massfr
 
-        # y[1:] = Y[0:N2_idx,loc] + Y[N2_idx+1:-1]
-        # pdb.set_trace()
-        # #create a dydt vector
-        dydt = np.zeros_like(y)
-        pyjacob.py_dydt(0, P, y, dydt)
-        #create a jacobian vector
-        jac = np.zeros(gas.n_species * gas.n_species)
-
-        #evaluate the Jacobian
-        pyjacob.py_eval_jacobian(0, P, y, jac)
-        jac = jac.reshape(gas.n_species,gas.n_species)
-
-        D, W, V = LA.eig(jac, left = True)
-
-
+        jac = create_jacobian(T,P,y)
+        
+        D, vl, vr = LA.eig(jac, left = True)
         D = D.real
-        max_val = 0
-        # pdb.set_trace()
-        for i in range(len(D)):
-            if D[i] > max_val:
-                # print D[i], gas.species_name(i)
-                max_val = D[i]
-                    # species_idx = i
-        eigenvalues[loc] = max_val
 
-    return eigenvalues
+        # Store the N most positive eigenvalues
+        eigenvalues_loc = D[np.argsort(D)[-N_eig:]]
+
+        max_idx = np.argmax(D)
+        max_eig = D[max_idx]    
+        
+        # Store explosive indices corresponding to chemical explosive mode at x loc(ation) in 1D domain
+        expl_indices = EI(D,vl,vr,max_idx)
+        # Find indices that would sort the EI (from lowest to highest)
+        sorted_idx = np.argsort(expl_indices) 
+
+        # select indices of 5 most important species (attention: pyjac position index!! need converting with reorder_species)
+        main_species_local = sorted_idx[-N_EI:]
+        # Union operation between indices of main species at x loc(ation) and previous important species
+        track_specs = np.union1d(main_species_local,track_specs)
+        
+        global_expl_indices[:,loc] = expl_indices 
+        eigenvalues[:,loc] = eigenvalues_loc
+        
+    
+    track_specs = track_specs.astype(np.int64)
+
+    return eigenvalues, global_expl_indices, track_specs
+
+def reorder_species(pyjac_indices, N2_idx):
+
+    # subtract one position to pyjac indices up to index where N2 was taken out of species list:
+    # example: cantera species [O H N2 CH3 CH4], pyjac y vector [T O H CH3 CH4]
+    # --> to bring back to original cantera species indices, need to subtract 1 to positions up to index of N2 (2 here)
+    
+    cantera_idx = pyjac_indices
+    
+    for i in range(len(cantera_idx)):
+
+        if cantera_idx[i] == 0:
+            # in the case that temperature has one of the highest explosive indices
+            print "Temperature is EI --> add treatment of this case"
+            pdb.set_trace()
+
+        elif cantera_idx[i] <= N2_idx:
+            cantera_idx[i] -= 1  
+
+    return cantera_idx
+
+def list_spec_names(cantera_order,gas):
+    species_names=[]
+    for i in range(len(cantera_order)):
+
+        species_names.append(gas.species_name(cantera_order[i]))
+
+
+    return species_names
+
+def get_species_names(tracked_species_idx, gas):
+
+    # Returns dictionary with trackes species names as keys, indices in pyjac notation as values
+    # tracked_species_idx is in pyjac notation (reordered N2 at the end).
+    N2_idx = gas.species_index('N2')   
+    # Revert pyjac ordering
+    cantera_species_idx = reorder_species(tracked_species_idx, N2_idx)
+    # get species names corresponding to cantera_species_idx 
+    species_names = list_spec_names(cantera_species_idx, gas)
+    # create dictionary with species names (string) as keys and pyjac indices as values
+    dictionary = dict(zip(species_names,tracked_species_idx))
+
+    return dictionary
+
+
+def create_jacobian(T,P,y):
+
+    n_species = len(y)
+    dydt = np.zeros_like(y)
+    pyjacob.py_dydt(0, P, y, dydt)
+    
+    #create a jacobian vector
+    jac = np.zeros(n_species*n_species)
+
+    #evaluate the Jacobian
+    pyjacob.py_eval_jacobian(0, P, y, jac)
+    jac = jac.reshape(n_species,n_species)
+
+    return jac
+
 
 def setSolutionProperties(gas,Z,press=1):
 
