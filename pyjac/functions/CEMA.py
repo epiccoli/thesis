@@ -3,7 +3,7 @@ import pyjacob
 import scipy.linalg as LA
 import cantera as ct
 import pdb
-
+import matplotlib.pyplot as plt
 
 def solve_eig_gas(gas):
 
@@ -108,7 +108,7 @@ def find_max_eigenvalue(gas):
 
 
 def solve_eig_flame(f,gas):
-    N_eig = 2 # selects number of eigenvalues to store for each flame location
+    N_eig = 3 # selects number of eigenvalues to store for each flame location
     N_EI = 1 # number of EI species to track 
 
     T = f.T # 1D array with temperatures
@@ -119,6 +119,8 @@ def solve_eig_flame(f,gas):
     grid_pts = len(f.grid)
 
     eigenvalues = np.zeros([N_eig, grid_pts])
+    # manual_eig = np.zeros(grid_pts)
+    eig_position = np.zeros(grid_pts)
     
     track_specs=[]      # initialised as list, then converts to np.array when using np.union1d
     global_expl_indices = np.zeros([n_species, grid_pts])
@@ -136,7 +138,10 @@ def solve_eig_flame(f,gas):
         
         D, vl, vr = LA.eig(jac, left = True)
         D = D.real
-
+        # print eigenvalues
+        # if loc % 10 == 0:
+        #     print D
+        #     pdb.set_trace()
         # Store the N most positive eigenvalues
         eigenvalues_loc = D[np.argsort(D)[-N_eig:]]
 
@@ -155,6 +160,16 @@ def solve_eig_flame(f,gas):
         
         global_expl_indices[:,loc] = expl_indices 
         eigenvalues[:,loc] = eigenvalues_loc
+        
+        # if loc == 0:
+        #     idx_max_eig = np.argmax(D)
+
+        # manual_eig[loc] = D[idx_max_eig]
+        eig_position[loc] = np.argmax(D)
+
+    plt.figure()
+    plt.plot(f.grid,eig_position)
+    plt.show()
         
     
     track_specs = track_specs.astype(np.int64)

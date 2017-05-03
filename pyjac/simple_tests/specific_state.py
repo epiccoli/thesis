@@ -14,16 +14,17 @@ import scipy.linalg as LA
 
 
 
+QSS_species = ['N2','H','H2','O','OH','O2','H2O2','H2O','HO2','CO','CH3','CH2O','CO2','CH4','C2H2','C2H4','CH2CO','C2H6']
 
 #create gas from original mechanism file gri30.cti
 gas = ct.Solution('Skeletal29_N.cti')
 #reorder the gas to match pyJac
-n2_ind = gas.species_index('N2')
-# print(n2_ind)
+N2_ind = gas.species_index('N2')
+# print(N2_ind)
 specs = gas.species()[:]
 # reorder to have the last entry as N2 -> when NOx not considered?
 gas = ct.Solution(thermo='IdealGas', kinetics='GasKinetics',
-        species=specs[:n2_ind] + specs[n2_ind + 1:] + [specs[n2_ind]],
+        species=specs[:N2_ind] + specs[N2_ind + 1:] + [specs[N2_ind]],
         reactions=gas.reactions())
 
 
@@ -35,11 +36,43 @@ T = 800  # K
 gas.set_equivalence_ratio(phi, 'C2H4', 'O2:1.0, N2:3.76')
 gas.TP = T,P
 
-D,l,r = EigPbJac(gas)
+y = np.zeros(gas.n_species)
+y_massfr = np.concatenate([gas.Y[0:N2_ind], gas.Y[N2_ind+1:]])
+
+# TEST EIG without QSS species
+
+y_massfr_counter = 0
+for i in range(len(QSS_species)):
+	if i < N2_ind:
+		# check if species is in QSS, if not, strip element from y_massfr
+		if gas.species_name(i) not in QSS_species:
+			print gas.species_name(i), " is not in QSS"
+			y_massfr = np.delete(y_massfr,y_massfr_counter)
+
+		y_massfr_counter += 1
+
+	if i > N2_ind:
+		# check if species is in QSS, if not, strip element from y_massfr
+		if gas.species_name(i) not in QSS_species:
+			print gas.species_name(i), " is not in QSS"
+			y_massfr = np.delete(y_massfr,y_massfr_counter)
+		y_massfr_counter += 1
+
+pdb.set_trace()
+y[0] = T
+y[1:] = y_massfr
+
+jac = create_jacobian(T,P,y)
+
+D, vl, vr = LA.eig(jac, left = True)
+
+print np.amax(D)
+
+pdb.set_trace()
 
 
 
-# print D
+# print D,
 
 
 real_lambda = D.real

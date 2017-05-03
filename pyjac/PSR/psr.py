@@ -27,6 +27,9 @@ T = 1400
 npoints = 1000
 timestep = 1.5e-7
 
+# Plots
+plot_eigenvalue = False
+
 # Create gas object
 gas = ct.Solution('Skeletal29_N.cti')
 
@@ -48,8 +51,7 @@ for i in range(1,gas.n_species):
 	print gas.species_name(i)
 print EI_keys	
 
-track_entries = ['H', 'OH', 'CH', 'HO2', 'HCO', 'H2O2', 'CH3', 'O2', 'C']
-idx_entries = [1, 4, 19, 8, 20, 6, 10, 5, 18]
+
 # prova manuale : H (entry 1)
 
 ## SET EQUIVALENCE RATIO TO phi, temperature and pressure
@@ -84,6 +86,7 @@ tt=[]
 ei_sp=[]
 
 eigenvalues = np.zeros((N_eig,data_length))
+expl_indices = np.zeros((gas.n_species,data_length))
 
 count=0
 
@@ -102,11 +105,11 @@ for n in range(npoints):
 		tt.append(time)
 
 		eigenvalues[:,count] = D[np.argsort(D)[-N_eig:]]		# matrix with N_eig lines
-		print D[np.argsort(D)[-N_eig:]]
+		# print D[np.argsort(D)[-N_eig:]]
 
-		expl_indices = EI(D,L,R,max_idx)
-		ei_sp.append(expl_indices[18])
-		stats(expl_indices,EI_keys)
+		expl_indices[:,count] = EI(D,L,R,max_idx)
+		ei_sp.append(expl_indices[18,count])
+		# stats(expl_indices,EI_keys)
 		
 		count += 1
 
@@ -116,12 +119,15 @@ for n in range(npoints):
 	press[n]= r.thermo.P
 	file1.write('%10.6f %10.4f %10.6f \n' % (sim.time,r.T,r.thermo.P))
 
+file1.close()
+
+
 # TAI = findAIT(gas,timestep,npoints)
 # gas = gas_cp
 
 end = t.time()
 # 
-print len(val)
+
 print end-start, ' seconds'	
 
 
@@ -129,33 +135,41 @@ print end-start, ' seconds'
 dT=np.diff(temp)
 dTdt = dT/np.diff(tim)
 
-
-file1.close()
+selected_species = []
 
 plt.figure(figsize=(10,5))
-plt.subplot(4,1,1)
+plt.subplot(3,1,1)
 plt.plot(tim,temp)
 plt.title('Temp')
 
-plt.subplot(4,1,2)
+plt.subplot(3,1,2)
 plt.plot(tt,np.array(val)/1e6)
 plt.title('Eig')
 
-plt.subplot(4,1,3)
+plt.subplot(3,1,3)
 plt.plot(np.arange(0,len(dT)),dT)
 plt.title('Temperature gradient')
 
-plt.subplot(4,1,4)
-plt.plot(np.arange(0,len(ei_sp)),ei_sp)
-
 plt.show()
+
 
 plt.figure()
 
-for i in range(N_eig):
-	plt.plot(tt,np.log10(eigenvalues[i,:]+1))
+track_entries = ['H', 'OH', 'CH', 'HO2', 'HCO', 'H2O2', 'CH3', 'O2', 'C']
+idx_entries = [1, 4, 19, 8, 20, 6, 10, 5, 18]
 
+for i in idx_entries:
+	plt.plot(np.arange(data_length),expl_indices[i,:],label=EI_keys[i])
+plt.legend()
 plt.show()
+
+if plot_eigenvalue == True:
+	plt.figure()
+
+	for i in range(N_eig):
+		plt.plot(tt,np.log10(eigenvalues[i,:]+1))
+
+	plt.show()
 
 
 print 'maximum heat release rate at time ', tim[np.argmax(np.diff(temp))]

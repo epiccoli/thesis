@@ -41,27 +41,36 @@ f.solve(loglevel=0, auto=True)
 # print('\nmixture-averaged flamespeed = {:7f} m/s\n'.format(f.u[0]))
 
 # Chemical explosive mode analysis for 1D flame
-eigenvalues, global_expl_indices, track_species = solve_eig_flame(f,gas)
+eigenvalues, global_expl_indices, track_species= solve_eig_flame(f,gas)
+
+# print eigenvalues[2,:]
+# pdb.set_trace()
 
 spec_dictionary = get_species_names(track_species,gas)
 
 
 
 manual_spec = ['CH', 'OH', 'H', 'HCO', 'H2O2']
-manual_spec = ['CO', 'HCO', 'O', 'O2', 'C']
+# manual_spec = ['CO', 'HCO', 'O', 'O2', 'C']
 
 # TO SEE WHICH SPECIES ARE IN DICTIONARY OF MOST EXPLOSIVE SPECIES
 # print spec_dictionary
+# {'C': 18, 'CH': 19, 'CO': 9, 'H2O2': 6, 'OH': 4, 'H2': 2, 'H': 1, 'O': 3, 'HCO': 20, 'C2H5O': 28, 'CH3': 10, 'TXCH2': 21, 'SXCH2': 22, 'O2': 5}
 
 ## EIG FIGURE ## 
 
-plt.figure()
-plt.plot(f.grid,np.log10(eigenvalues[0,:]+1),'--')
+# TEST one eigenvalue at a time
+# plt.figure()
+# plt.plot(f.grid,np.log10(eigenvalues[0,:]+1),'--')
+# PLOT all eigenvalues stored
+for i in range(len(eigenvalues[:,0])):
+	plt.semilogy(f.grid,eigenvalues[i,:]/1e6,'--',label=str(i))
 
-pdb.set_trace()
-# for i in range(len(eigenvalues[:,0])):
-# 	plt.plot(f.grid,np.log10(eigenvalues[i,:]+1),'--')
+# plt.plot(f.grid,np.log10(manual_eig[:]+1),'--',label='manual')
 
+plt.legend()
+plt.xlabel('1D flame domain')
+plt.title('Maximum eigenvalues (from lowest to highest)')
 plt.show()
 
 plt.figure()
