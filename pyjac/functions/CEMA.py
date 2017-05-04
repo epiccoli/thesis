@@ -46,7 +46,7 @@ def EI(D,l,r,k):
 
     
     a = r[:,k]
-    b = l[k,:]  
+    b = l[:,k] # changed this according to documentation 
     
     jac_dim = len(a)
 
@@ -108,7 +108,7 @@ def find_max_eigenvalue(gas):
 
 
 def solve_eig_flame(f,gas):
-    N_eig = 3 # selects number of eigenvalues to store for each flame location
+    N_eig = 1# selects number of eigenvalues to store for each flame location
     N_EI = 1 # number of EI species to track 
 
     T = f.T # 1D array with temperatures
@@ -145,6 +145,8 @@ def solve_eig_flame(f,gas):
         # Store the N most positive eigenvalues
         eigenvalues_loc = D[np.argsort(D)[-N_eig:]]
 
+
+
         max_idx = np.argmax(D)
         max_eig = D[max_idx]    
         
@@ -167,9 +169,10 @@ def solve_eig_flame(f,gas):
         # manual_eig[loc] = D[idx_max_eig]
         eig_position[loc] = np.argmax(D)
 
-    plt.figure()
-    plt.plot(f.grid,eig_position)
-    plt.show()
+    # Plot max eig position index
+    # plt.figure()
+    # plt.plot(f.grid,eig_position)
+    # plt.show()
         
     
     track_specs = track_specs.astype(np.int64)
@@ -188,8 +191,8 @@ def reorder_species(pyjac_indices, N2_idx):
 
         if cantera_idx[i] == 0:
             # in the case that temperature has one of the highest explosive indices
-            print "Temperature is EI --> add treatment of this case"
-            pdb.set_trace()
+            print "Temperature is EI --> check that functionality works"
+            cantera_idx[i] = -1
 
         elif cantera_idx[i] <= N2_idx:
             cantera_idx[i] -= 1  
@@ -199,8 +202,10 @@ def reorder_species(pyjac_indices, N2_idx):
 def list_spec_names(cantera_order,gas):
     species_names=[]
     for i in range(len(cantera_order)):
-
-        species_names.append(gas.species_name(cantera_order[i]))
+        if cantera_order[i] == -1:
+            species_names.append('T')
+        else:
+            species_names.append(gas.species_name(cantera_order[i]))
 
 
     return species_names
@@ -216,6 +221,8 @@ def get_species_names(tracked_species_idx, gas):
     species_names = list_spec_names(cantera_species_idx, gas)
     # create dictionary with species names (string) as keys and pyjac indices as values
     dictionary = dict(zip(species_names,tracked_species_idx))
+    # reset temperature index in pyjac notation
+    dictionary['T'] = 0
 
     return dictionary
 
