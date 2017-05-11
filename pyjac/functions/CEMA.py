@@ -34,9 +34,27 @@ def solve_eig_gas(gas):
 
     # Solve eigenvalue PB > D: eigenvalues
     D, vl, vr = LA.eig(jac, left = True)
+
     D=D.real
+    vl=vl.real
+    vr=vr.real
+    
+    # introduced to get rid of zeros: careful!
+    # D = np.delete(D,np.where(D==0.0))
+    # cannot delete here, must be after (affects EI)
+
 
     return D, vl, vr
+
+def highest_val_excl_0(vect,N_val):
+
+    # take out all zero entries
+    vect = np.delete(vect,np.where(vect==0.0))
+    
+    top_val = vect[np.argsort(vect)[-N_val:]]
+
+    return top_val
+
 
 
 def EI(D,l,r,k):
@@ -139,9 +157,9 @@ def solve_eig_flame(f,gas):
         D, vl, vr = LA.eig(jac, left = True)
         D = D.real
         # print eigenvalues
-        # if loc % 10 == 0:
-        #     print D
-        #     pdb.set_trace()
+        if loc % 10 == 0:
+            print D
+            pdb.set_trace()
         # Store the N most positive eigenvalues
         eigenvalues_loc = D[np.argsort(D)[-N_eig:]]
 
@@ -153,7 +171,7 @@ def solve_eig_flame(f,gas):
         # Store explosive indices corresponding to chemical explosive mode at x loc(ation) in 1D domain
         expl_indices = EI(D,vl,vr,max_idx)
         # Find indices that would sort the EI (from lowest to highest)
-        sorted_idx = np.argsort(expl_indices) 
+        sorted_idx = np.argsort(expl_indices)     
 
         # select indices of 5 most important species (attention: pyjac position index!! need converting with reorder_species)
         main_species_local = sorted_idx[-N_EI:]
@@ -214,6 +232,7 @@ def get_species_names(tracked_species_idx, gas):
 
     # Returns dictionary with trackes species names as keys, indices in pyjac notation as values
     # tracked_species_idx is in pyjac notation (reordered N2 at the end).
+    pdb.set_trace()
     N2_idx = gas.species_index('N2')   
     # Revert pyjac ordering
     cantera_species_idx = reorder_species(tracked_species_idx, N2_idx)

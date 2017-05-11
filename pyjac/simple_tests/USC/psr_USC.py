@@ -12,6 +12,11 @@ import time as t
 import pdb
 
 
+## Conditional ##
+
+mode = 'selectedEig' 
+mode = 'n_eig'
+
  
 def stats(vector,keys):
 
@@ -32,9 +37,11 @@ npoints = 1000
 timestep = 1.5e-7
 CEMA_interval = 1 # only divisors of npoints
 data_length = int(npoints/CEMA_interval)
-N_eig = 1
+N_eig = 7
 N_EI = 1
+#### options 
 first_eigenmode = True
+first_ei = True
 
 # Plots
 plot_eigenvalue = True
@@ -89,6 +96,7 @@ file1 = open('xmgrace.txt','w')
 
 val=[]
 tt=[]
+val_ei = []
 
 eigenvalues = np.zeros((N_eig,data_length))
 expl_indices = np.zeros((gas.n_species,data_length))
@@ -97,7 +105,8 @@ track_species = []
 
 count=0
 
-max_new = []
+most_aligned_eig = []
+most_aligned_ei = []
 
 
 start = t.time()
@@ -116,20 +125,21 @@ for n in range(npoints):
 
 
 		########### START TEST PARALLEL ###############
-		print n
-		if first_eigenmode == True:
-			CEM = eigenmode(D,L,R)
-			first_eigenmode = False
-			print "numbers of passages ici"
+		# # print n
+		# if first_eigenmode == True:
+		# 	CEM = eigenmode(D,R)
+		# 	first_eigenmode = False
 
-		idx_CEM = test_parallel(L,R,CEM)
-		# print D[idx_CEM]
-		max_new.append(D[idx_CEM])
+		# idx_CEM = test_parallel(R,CEM)
+		# # print D[idx_CEM]
+		# most_aligned_eig.append(D[idx_CEM])
 
 		########### END TEST PARALLEL #############
 
 
+
 		########### START TEST FOLLOW VALUE ############
+
 		# if count == 0:
 		# 	eigenvalues[:,count] = D[np.argsort(D)[-N_eig:]]		# matrix with N_eig lines
 		
@@ -147,11 +157,24 @@ for n in range(npoints):
 		# 	next_eig = match_eig(D,guess_val)
 
 		# 	eigenvalues[:,count] = next_eig
-		# modified to not take into account eigenvalues = 0.0000000
+		# # modified to not take into account eigenvalues = 0.0000000
 		# eigenvalues[:,count] = highest_val_excl_0(D,N_eig)
 		
 		########### END TEST FOLLOW VALUE ############
 
+		########### START TEST EI PARALLEL ###########
+
+		# if first_eigenmode == True:
+		# 	ei_vec0 = EI(D,L,R,max_idx)
+		# 	first_eigenmode = False
+
+		# idx_CEM = test_ei_parallel(L,R,ei_vec0)
+
+
+		# most_aligned_ei.append(D[idx_CEM])
+
+
+		########### END TEST EI PARALLEL ###########
 
 		eigenvalues[:,count] = D[np.argsort(D)[-N_eig:]]
 		
@@ -163,11 +186,41 @@ for n in range(npoints):
 		# 	# print D[np.argsort(D)[-N_eig:]]
 		# 	pdb.set_trace()
 
+		##### START track EI similar to previous #####
+		
+		# if first_ei == True:
+		# 	ei_prev = EI(D,L,R,max_idx)
+		# 	first_ei = False
+
+		# new_ei, idx_followed = follow_ei(D,L,R,ei_prev)
+		# ei_prev = new_ei
+		# pdb.set_trace()
+		# print idx_followed
+		# print max_idx
+		# print count
+
+		# expl_indices[:,count] = new_ei
+		# val_ei.append(D[idx_followed])
+
+		##### END track EI similar to previous #####
+
+		## MANUALLY CHANGE WHICH EIG on which to base EI calc: -6 is eig 1
+		#   6 5 4 3 2 1 0
+		# -[1 2 3 4 5 6 7]
+		if tt[count] < 9.76e-5:
+			max_idx = np.argsort(D)[-1]
+		else:
+			max_idx = np.argsort(D)[-6]
+
+		# max_idx = np.argsort(D)[-5]
+
 		expl_indices[:,count] = EI(D,L,R,max_idx)
 		main_EI = np.argsort(expl_indices[:,count])
 		# manual identification of important species indices
 		# print main_EI
 		# pdb.set_trace()
+
+
 
 		track_species = np.union1d(main_EI,track_species)
 
@@ -223,37 +276,66 @@ plt.show()
 track_entries = ['T', 'H', 'O', 'OH', 'HO2', 'O2']
 idx_entries = [0, 4, 5, 6, 7, 2]
 
-idx_entries = [2, 7, 13, 5]
-track_entries = ['H', 'HO2', 'CH3', 'OH']
+# idx_entries = [2, 7, 13, 5]
+# track_entries = ['H', 'HO2', 'CH3', 'OH']
 
 #### EI plot ####
-# plt.figure()
-# for i in range(len(idx_entries)):
-# 	plt.plot(tt,expl_indices[idx_entries[i],:],label=track_entries[i])
-# plt.legend()
-# plt.show()
+plt.figure()
+for i in range(len(idx_entries)):
+	plt.plot(tt,expl_indices[idx_entries[i],:],linestyle='--', marker='o',label=track_entries[i])
+plt.axvline(x=9.76e-5, ymin=0., ymax = 1, linewidth=1, color='k')
+plt.legend()
+plt.show()
 
 
 
 
 #### EIG PLOT ####
-if plot_eigenvalue == True:
-	plt.figure()
+
+if mode == 'n_eig':
 
 	for i in range(N_eig):
-		plt.plot(tt,eigenvalues[i,:]/1e6)
+		# plt.subplot(N_eig,1,i+1) # comment to overlay instead of subplot
+		plt.plot(tt,eigenvalues[i,:]/1e6,'--',label=str(i))
+		plt.legend() 
+		# pdb.set_trace()
 
-	# post_treatment of max_new and tt
-	# discard values of max_new/1e6 < 0.5
 
-	max_new = np.array(max_new)
-	pdb.set_trace()
-	tt = np.delete(tt,np.where(max_new < -8e5))
-	max_new = np.delete(max_new,np.where(max_new < -8e5))
+if mode == 'selectedEig':	
+	plt.figure()
+	# PLOT ONLY FOR COMPARISON
+	# i=6
+	# plt.plot(tt,eigenvalues[i,:]/1e6,'.',label='CEM high')
+	# i=0
+	# plt.plot(tt,eigenvalues[i,:]/1e6,'.',label='first neg')
+	# i=1
+	# plt.plot(tt,eigenvalues[i,:]/1e6,'.',label='CEM')
 
-	plt.plot(tt,np.array(max_new)/1e6,'.',label='max_new')
-	plt.legend()
-	plt.show()
+
+
+	i=5
+	plt.plot(tt,eigenvalues[i,:]/1e6,'--',label=str(i))
+	i=2
+	plt.plot(tt,eigenvalues[i,:]/1e6,'--',label=str(i))
+	i=4
+	plt.plot(tt,eigenvalues[i,:]/1e6,'--',label=str(i))
+	i=3
+	plt.plot(tt,eigenvalues[i,:]/1e6,'--',label=str(i))
+
+
+
+# post_treatment of most_aligned_eig and tt
+# discard values of most_aligned_eig/1e6 < 0.5
+
+most_aligned_eig = np.array(most_aligned_eig)
+# pdb.set_trace()
+tt = np.delete(tt,np.where(most_aligned_eig < -8e5))
+most_aligned_eig = np.delete(most_aligned_eig,np.where(most_aligned_eig < -8e5))
+
+# plt.plot(tt,np.array(most_aligned_eig)/1e6,'.',label='most_aligned_eig')
+# plt.plot(tt,np.array(most_aligned_ei)/1e6,'.',label='most_aligned_ei')
+plt.legend()
+plt.show()
 
 
 print 'maximum heat release rate at time ', tim[np.argmax(np.diff(temp))]
