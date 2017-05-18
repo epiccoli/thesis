@@ -1,5 +1,5 @@
 import numpy as np
-import pyjacob
+import pyjacob      # no need to specify location, this is done in the main script file (thus selecting the pyjacob.so created with the correct mechanism )
 import scipy.linalg as LA
 import cantera as ct
 import pdb
@@ -82,51 +82,126 @@ def EI(D,l,r,k):
 # def PI()
 
 
-def find_max_eigenvalue(gas):
-
-    # input arg: gas cantera object
-    # output arg: max chemical eigenvalue
-
-    T = gas.T
-    P = gas.P
-    
-    # #setup the state vector
-    y = np.zeros(gas.n_species)
-    y[0] = T
-    y[1:] = gas.Y[:-1]
-    
-    # #create a dydt vector
-    dydt = np.zeros_like(y)
-    pyjacob.py_dydt(0, P, y, dydt)
-
-    #create a jacobian vector
-    jac = np.zeros(gas.n_species * gas.n_species)
-
-
-    #evaluate the Jacobian
-    pyjacob.py_eval_jacobian(0, P, y, jac)
-
-    jac = jac.reshape(gas.n_species,gas.n_species)
-
-    # Solve eigenvalue PB > D: eigenvalues
-    D, W, V = LA.eig(jac, left = True)
-
-    # FINDS HIGHEST EIGENVALUE FOR EACH POINT
-    # Take only real part into account
-    D = D.real
-    max_val = 0
-    for i in range(len(D)):
-        if D[i] > max_val:
-            # print D[i], gas.species_name(i)
-            max_val = D[i]
-            species_idx = i
-            print species_idx
-
-    return max_val
-
-
 def solve_eig_flame(f,gas):
-    N_eig = 1# selects number of eigenvalues to store for each flame location
+    N_eig = 8# selects number of eigenvalues to store for each flame location
+    N_EI = 3 # number of EI species to track 
+
+    T = f.T # 1D array with temperatures
+    Y = f.Y # matrix array with lines corresponding to the 29 species, columns corresponding to the grid points
+    P = f.P # single value
+
+    n_species = gas.n_species 
+    grid_pts = len(f.grid)
+
+    # STORE ALL N_eig maximum eigenvalues in all grid points
+    eigenvalues = np.zeros([N_eig, grid_pts])
+    # Indices species to track (with highest EI) 
+    track_specs=[]      # initialised as list, then converts to np.array when using np.union1d
+    # Explosive indices along all the flame
+    global_expl_indices = np.zeros([n_species, grid_pts])
+    # Followed by EI eigenvalue
+    eig_CEM = np.empty(grid_pts)
+    # initialize maximum eig
+    max_eig = -1e3
+
+    # FIND HIGHEST EIGENVALUE ALONG FLAME
+    for loc in range(grid_pts):
+        y=np.zeros(n_species)
+        y[0] = T[loc]
+        # find the position of N2 species
+        N2_idx = gas.species_index('N2')   
+        y_massfr = np.concatenate([Y[0:N2_idx,loc], Y[N2_idx+1:,loc]])
+        y[1:] = y_massfr
+
+        jac = create_jacobian(T,P,y)
+        
+        D, L, R = LA.eig(jac, left = True)
+        D = D.real
+
+        max_eig_i = np.amax(D)
+
+        if max_eig_i > max_eig:
+            max_eig = max_eig_i
+            max_eig_idx = np.argmax(D)      # position of maximum eigenvalue at max eigenvalue position
+            max_eig_loc = loc
+    
+    # FORWARD FOLLOWING
+    for loc in range(max_eig_loc,grid_pts):
+
+        y=np.zeros(n_species)
+        y[0] = T[loc]
+        # find the position of N2 species
+        N2_idx = gas.species_index('N2')
+        y_massfr = np.concatenate([Y[0:N2_idx,loc], Y[N2_idx+1:,loc]])
+        y[1:] = y_massfr
+
+        jac = create_jacobian(T,P,y)
+        
+        D, L, R = LA.eig(jac, left = True)
+        D = D.real
+
+        if loc == max_eig_loc:
+            ei_previous = EI(D,L,R,max_eig_idx)     # false previous
+
+        alignment = np.zeros(len(D))
+        
+        for idx in range(len(D)):
+            alignment[idx] = parallelism(EI(D,L,R,idx), ei_previous)
+
+        best_fit_idx = np.argmax(alignment)
+        ei_current = EI(D,L,R,best_fit_idx)
+
+        main_species_local = np.argsort(ei_current)[-N_EI:]
+        track_specs = np.union1d(main_species_local,track_specs)
+
+        # Store followed EI eigenvalue (CEM) and EI
+        global_expl_indices[:,loc] = ei_current
+        eig_CEM[loc] = D[best_fit_idx]
+
+        ei_previous = ei_current
+
+    # BACKWARDS FOLLOWING
+    for loc in range(max_eig_loc,-1,-1):
+
+        y=np.zeros(n_species)
+        y[0] = T[loc]
+        # find the position of N2 species
+        N2_idx = gas.species_index('N2')
+        y_massfr = np.concatenate([Y[0:N2_idx,loc], Y[N2_idx+1:,loc]])
+        y[1:] = y_massfr
+
+        jac = create_jacobian(T,P,y)
+        
+        D, L, R = LA.eig(jac, left = True)
+        D = D.real
+
+        if loc == max_eig_loc:
+            ei_previous = EI(D,L,R,max_eig_idx)     # false previous
+
+        alignment = np.zeros(len(D))
+        
+        for idx in range(len(D)):
+            alignment[idx] = parallelism(EI(D,L,R,idx), ei_previous)
+        
+        best_fit_idx = np.argmax(alignment)
+        ei_current = EI(D,L,R,best_fit_idx)
+
+        main_species_local = np.argsort(ei_current)[-N_EI:]
+        track_specs = np.union1d(main_species_local,track_specs)
+
+        # Store followed EI eigenvalue (CEM) and EI
+        global_expl_indices[:,loc] = ei_current
+        eig_CEM[loc] = D[best_fit_idx]
+
+        ei_previous = ei_current
+
+    track_specs=map(int,track_specs)
+
+    return eig_CEM, global_expl_indices, track_specs, max_eig_loc
+
+
+def solve_eig_flame_OLD(f,gas, switch_x1, switch_x2):
+    N_eig = 8# selects number of eigenvalues to store for each flame location
     N_EI = 1 # number of EI species to track 
 
     T = f.T # 1D array with temperatures
@@ -137,12 +212,11 @@ def solve_eig_flame(f,gas):
     grid_pts = len(f.grid)
 
     eigenvalues = np.zeros([N_eig, grid_pts])
-    # manual_eig = np.zeros(grid_pts)
-    eig_position = np.zeros(grid_pts)
     
     track_specs=[]      # initialised as list, then converts to np.array when using np.union1d
     global_expl_indices = np.zeros([n_species, grid_pts])
-    
+    eig_CEM = []
+
     # iterate over x-span of 1D flame domain
     for loc in range(grid_pts):
         y=np.zeros(n_species)
@@ -156,46 +230,53 @@ def solve_eig_flame(f,gas):
         
         D, vl, vr = LA.eig(jac, left = True)
         D = D.real
-        # print eigenvalues
-        if loc % 10 == 0:
-            print D
-            pdb.set_trace()
-        # Store the N most positive eigenvalues
-        eigenvalues_loc = D[np.argsort(D)[-N_eig:]]
-
-
-
-        max_idx = np.argmax(D)
-        max_eig = D[max_idx]    
         
-        # Store explosive indices corresponding to chemical explosive mode at x loc(ation) in 1D domain
-        expl_indices = EI(D,vl,vr,max_idx)
-        # Find indices that would sort the EI (from lowest to highest)
-        sorted_idx = np.argsort(expl_indices)     
+        # Store the N most positive eigenvalues
+        eigenvalues_loc = D[np.argsort(D)[-N_eig:]]    
 
-        # select indices of 5 most important species (attention: pyjac position index!! need converting with reorder_species)
-        main_species_local = sorted_idx[-N_EI:]
+        # PATCHING OF EI (methane gri30.cti)
+        # switch_x1 = 0.0106049
+        # switch_x2 = 0.0106081
+        switch_idx1 = np.where(f.grid > switch_x1)
+        switch_idx2 = np.where(f.grid > switch_x2)
+
+        # order is the 
+        if loc < switch_idx1[0][0]:
+            order = -1
+        if loc > switch_idx1[0][0] and loc < switch_idx2[0][0]:
+            order = -6
+        if loc > switch_idx2[0][0]:
+            order = -7
+        
+        # order = -8  
+        ei_idx = np.argsort(D)[order]
+        # Store explosive indices corresponding to chemical explosive mode at x loc(ation) in 1D domain
+        expl_indices = EI(D,vl,vr,ei_idx)
+        # GET MOST IMPORTANT SPECIES
+        # select indices of N_EI most important species (attention: pyjac position index!! need converting with reorder_species)
+        main_species_local = np.argsort(expl_indices)[-N_EI:]
         # Union operation between indices of main species at x loc(ation) and previous important species
         track_specs = np.union1d(main_species_local,track_specs)
         
         global_expl_indices[:,loc] = expl_indices 
         eigenvalues[:,loc] = eigenvalues_loc
-        
-        # if loc == 0:
-        #     idx_max_eig = np.argmax(D)
 
-        # manual_eig[loc] = D[idx_max_eig]
-        eig_position[loc] = np.argmax(D)
-
-    # Plot max eig position index
-    # plt.figure()
-    # plt.plot(f.grid,eig_position)
-    # plt.show()
-        
+        # Store patched eigenvalue CEM
+        eig_CEM.append(D[np.argsort(D)[order]])
     
     track_specs = track_specs.astype(np.int64)
 
-    return eigenvalues, global_expl_indices, track_specs
+    return eigenvalues, global_expl_indices, track_specs, eig_CEM
+
+
+# def 
+# EI_keys = ['']*gas.n_species
+
+# EI_keys[0] = 'T'
+# for i in range(1,gas.n_species):
+#     EI_keys[i] = gas.species_name(i-1)
+#     print gas.species_name(i)
+# print EI_keys   
 
 def reorder_species(pyjac_indices, N2_idx):
 
@@ -209,7 +290,7 @@ def reorder_species(pyjac_indices, N2_idx):
 
         if cantera_idx[i] == 0:
             # in the case that temperature has one of the highest explosive indices
-            print "Temperature is EI --> check that functionality works"
+            print "Temperature is EI --> check that functionality works \n \t --> problem with list (passed as reference and modified)"
             cantera_idx[i] = -1
 
         elif cantera_idx[i] <= N2_idx:
@@ -232,7 +313,7 @@ def get_species_names(tracked_species_idx, gas):
 
     # Returns dictionary with trackes species names as keys, indices in pyjac notation as values
     # tracked_species_idx is in pyjac notation (reordered N2 at the end).
-    pdb.set_trace()
+    # pdb.set_trace()
     N2_idx = gas.species_index('N2')   
     # Revert pyjac ordering
     cantera_species_idx = reorder_species(tracked_species_idx, N2_idx)
@@ -245,6 +326,18 @@ def get_species_names(tracked_species_idx, gas):
 
     return dictionary
 
+def get_names(gas):
+
+    ei_components = []
+
+    ei_components.append('T')
+
+    for i in range(gas.n_species):
+        if gas.species_name(i) != 'N2':
+            ei_components.append(gas.species_name(i))
+
+    
+    return ei_components
 
 def create_jacobian(T,P,y):
 
@@ -375,3 +468,14 @@ def getEthyleneJetCompo(phi):
     compo = {'O2':f_O2_mass, 'N2':f_N2_mass, 'C2H4':f_C2H4_mass}
 
     return compo
+
+
+
+def parallelism(v1,v2):
+    # returns [-1,1]
+    num = np.dot(v1,v2)
+    den = LA.norm(v1)*LA.norm(v2)
+    # high value of parallelism 
+    parallelism = num/den
+
+    return parallelism
