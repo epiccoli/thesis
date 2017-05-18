@@ -82,7 +82,7 @@ def EI(D,l,r,k):
 # def PI()
 
 
-def solve_eig_flame(f,gas):
+def solve_eig_flame(f,gas, eig2track=0):
     N_eig = 8# selects number of eigenvalues to store for each flame location
     N_EI = 3 # number of EI species to track 
 
@@ -141,6 +141,8 @@ def solve_eig_flame(f,gas):
         D = D.real
 
         if loc == max_eig_loc:
+            if eig2track != 0:
+                max_eig_idx = np.argsort(D)[eig2track]
             ei_previous = EI(D,L,R,max_eig_idx)     # false previous
 
         alignment = np.zeros(len(D))
@@ -176,6 +178,8 @@ def solve_eig_flame(f,gas):
         D = D.real
 
         if loc == max_eig_loc:
+            if eig2track != 0:
+                max_eig_idx = np.argsort(D)[eig2track]
             ei_previous = EI(D,L,R,max_eig_idx)     # false previous
 
         alignment = np.zeros(len(D))
