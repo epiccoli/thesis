@@ -4,6 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pdb
 
+plot_QSS_species = True
+
 def main():
 
 	### GAS SETTINGS ###
@@ -65,7 +67,19 @@ def main():
 	print('mixture-averaged flamespeed = \t \t \t {:7f} m/s'.format(f.u[0]))
 	print('flame thickness based on max Temp gradient = \t {:5f} mm'.format(flame_thick*1e3))
 	print('maximum heat release rate = \t \t \t {:1.6e} unit'.format(max_HRR))
+
+	if plot_QSS_species == True:
 	
+		## SPECIES PLOT
+		QSS_spec = ['C','CH','HCO','TXCH2','SXCH2','C2H3','C2H5','HCCO','CH3CHO','CH2CHO','C2H5O']
+		
+		plt.figure()
+		for spec in QSS_spec:
+			y_spec = f.Y[gas.species_index(spec),:]
+			plt.semilogy(f.grid,y_spec, label=spec)
+		plt.legend()
+		plt.savefig('QSS_concentrations.pdf')
+		plt.show()
 
 
 
