@@ -25,10 +25,13 @@ def csv_append(line, path):
     with open(path, 'ab') as csv_file:
         writer = csv.writer(csv_file, delimiter=',')
         
-        writer.writerow(data)
+        writer.writerow(line)
 
-data = np.array([1.001012001230,2,3.0,4])
-stromg = 'Flat,second,thri'.split(',')
+            # line_write.tofile('foo.csv',sep=',',format='%1.5e')
+
+
+# data = np.array([1.001012001230,2,3.0,4])
+# stromg = 'Flat,second,thri'.split(',')
 
 def get_coordinates(file_in, row_nb):
 
@@ -42,41 +45,62 @@ def get_coordinates(file_in, row_nb):
     return np.array([x, y, z])
 
 
-
 def main():
-    file_in = 'slice_test.58.csv'
-
+    file_in = 'slice_test.58.csv'                       # argument 1
+    test_out = '0test_EIG_write.csv'
     column_name = get_variable_dict(file_in)
 
     ###### create state vector ######
-    gas = ct.Solution('Skeletal29_N.cti')
+    gas = ct.Solution('Skeletal29_N.cti')               # argument 2
 
-    point = 1 # point in space (idx)
-    # Load coordinates of node
-    coord = get_coordinates(file_in,point)
-    # Create state vector for node
-    y = build_state_vector(file_in,gas,point)
-    # Load pressure at node
-    P = load_val(file_in,point,column_name['pressure'])
+    header_line = 'Points:0,Points:1,Points:2,max_eig'.split(',')
+    csv_append(header_line,test_out)
+
+    for point in range(1,100):#count_lines(file_in)):
+        big_start = t.time()
+        # Load coordinates of node i
+        coord = get_coordinates(file_in,point)
+        # Create state vector for node i
+        y = build_state_vector(file_in,gas,point)
+        # Load pressure value at node i
+        P = load_val(file_in,point,column_name['pressure'])
+        # Solve eigenvalue problem at node i
+        D, L, R = solve_jacobian(P,y)
+        max_eig = np.amax(D)
+
+        line_write = np.append(coord, max_eig)
+        csv_append(line_write,test_out)
+
+        print t.time() - big_start, 'one loop'
+    pdb.set_trace()
+    
+    # point = 1 # point in space (idx)
+    # # Load coordinates of node
+    # coord = get_coordinates(file_in,point)
+    # # Create state vector for node
+    # y = build_state_vector(file_in,gas,point)
+    # # Load pressure at node
+    # P = load_val(file_in,point,column_name['pressure'])
 
     
-    # Solve eigenvalue problem at node 
-    D, L, R = solve_jacobian(P,y)
+    # # Solve eigenvalue problem at node 
+    # D, L, R = solve_jacobian(P,y)
 
-    max_eig = np.amax(D)
-    pdb.set_trace()
-    line_write = np.append(coord, max_eig)
-    print line_write
+    # max_eig = np.amax(D)
+    # pdb.set_trace()
+    # line_write = np.append(coord, max_eig)
+    # print line_write
 
-    csv_append(line_write,'test_EIG_write.csv')
-    pdb.set_trace()
+
+    # csv_append(line_write,'0test_EIG_write.csv')
+    # pdb.set_trace()
 
 
     # for i in range(1,count_lines(file_in)):
     #     print i
     #     pdb.set_trace()
 
-    print load_val(file_in,1,variable['zeta_y'])
+    # print load_val(file_in,1,variable['zeta_y'])
 
 
 
@@ -84,32 +108,32 @@ if __name__ == '__main__':
     main()
 pdb.set_trace()
 
-with open(file_in,'rb') as f:
+# with open(file_in,'rb') as f:
 
-    for element in csv.reader(first_line,delimiter=','):
-        print element
+#     for element in csv.reader(first_line,delimiter=','):
+#         print element
 
 
-    pdb.set_trace()
-    start = t.time()
-    data=f.read()
-    print t.time() - start
+#     pdb.set_trace()
+#     start = t.time()
+#     data=f.read()
+#     print t.time() - start
 
     
-new_data = data.replace('"','')
+# new_data = data.replace('"','')
 
-header=[]
-for i_line,row in enumerate(csv.reader(new_data.splitlines(),delimiter=',')):
-    # pdb.set_trace()
-    for element in row:
-        try:
-            float(element)
+# header=[]
+# for i_line,row in enumerate(csv.reader(new_data.splitlines(),delimiter=',')):
+#     # pdb.set_trace()
+#     for element in row:
+#         try:
+#             float(element)
 
-        except ValueError:
-            if i_line == 0:
-                header.append(element)
-            elif i_line > 0:
-                print "Non float encountered outside of header row -> check format of csv file"
+#         except ValueError:
+#             if i_line == 0:
+#                 header.append(element)
+#             elif i_line > 0:
+#                 print "Non float encountered outside of header row -> check format of csv file"
 
 
 

@@ -31,7 +31,7 @@ def load_val(file_in,row_nb,col_nb):
 # def make_state_vector(file_in)
 
 def count_lines(file_in):
-
+    # returns number of lines in file_in
     num_lines = sum(1 for line in open(file_in,'rb'))   # suggested to open in binary mode
 
     return num_lines
@@ -65,7 +65,8 @@ def build_state_vector(file_in,gas,row_nb):
         try:
             y[i] = load_val(file_in, row_nb, variable[phi[i]])
         except KeyError:
-            print('still need to extract those values of QSS')   
+            # print('still need to extract those values of QSS')   
+            pass
 
     return y
 
