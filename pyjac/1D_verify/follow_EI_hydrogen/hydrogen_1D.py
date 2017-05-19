@@ -23,7 +23,7 @@ T = 1100 # K
 
 # Eigenvalue to follow
 # eig2track = - # 0 for maximum eig
-fitting = 'cos'
+fitting = 'mac'
 
 # flame filename to store it and load it again
 flame_filename = 'saved_T={:.0f}_phi={:.4f}.xml'.format(T,phi)
@@ -55,7 +55,7 @@ print('\nmixture-averaged flamespeed = {:7f} m/s\n'.format(f.u[0]))
 for eig2track in range(-1,-10,-1):
     
     # graph filename
-    graph_filename = '{}_M{}_fuel={}_T={:.0f}_phi={:.4f}.pdf'.format(fitting,str(abs(eig2track)),fuel_species,T,phi)
+    graph_filename = '2nd_{}_M{}_fuel={}_T={:.0f}_phi={:.4f}.pdf'.format(fitting,str(abs(eig2track)),fuel_species,T,phi)
 
     
 

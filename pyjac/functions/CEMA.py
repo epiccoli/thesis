@@ -175,6 +175,9 @@ def solve_eig_flame(f,gas, fitting, eig2track=-1):
             best_fit_idx = np.argmax(mac)
         elif fitting == 'cos':
             best_fit_idx = np.argmax(alignment)
+
+        # if hard_points[loc] == 1:
+        #     best_fit_idx = np.argsort(mac)[-2]
      
         ei_current = EI(D,L,R,best_fit_idx)
 
@@ -222,6 +225,10 @@ def solve_eig_flame(f,gas, fitting, eig2track=-1):
             best_fit_idx = np.argmax(mac)
         elif fitting == 'cos':
             best_fit_idx = np.argmax(alignment)
+
+
+        # if hard_points[loc] == 1:
+        #     best_fit_idx = np.argsort(mac)[-2]
 
         ei_current = EI(D,L,R,best_fit_idx)
 
