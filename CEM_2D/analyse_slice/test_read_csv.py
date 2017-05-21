@@ -9,6 +9,7 @@ sys.path.append('../ethylene/')       # path to pyjacob.so
 from CEMA import *
 from read_slice import *
 import pyjacob
+import matplotlib.pyplot as plt
 
 
 # with open('slice_test.58.csv','rb') as csvfile:
@@ -19,61 +20,55 @@ import pyjacob
 #             print(element)
         # print(', '.join(row))
 
-
-def csv_append(line, path):
-
-    with open(path, 'ab') as csv_file:
-        writer = csv.writer(csv_file, delimiter=',')
-        
-        writer.writerow(line)
-
-            # line_write.tofile('foo.csv',sep=',',format='%1.5e')
-
-
-# data = np.array([1.001012001230,2,3.0,4])
-# stromg = 'Flat,second,thri'.split(',')
-
-def get_coordinates(file_in, row_nb):
-
-    column_name = get_variable_dict(file_in)
-
-    # Check if actually not mixed up order
-    x = load_val(file_in,row_nb,column_name['Points:0'])
-    y = load_val(file_in,row_nb,column_name['Points:1'])
-    z = load_val(file_in,row_nb,column_name['Points:2'])
-
-    return np.array([x, y, z])
-
-
 def main():
     file_in = 'slice_test.58.csv'                       # argument 1
+    file_in = 'phi1dot2_Tub320K_sL079ms_Ldomain0dot03m.csv'
     test_out = '0test_EIG_write.csv'
     column_name = get_variable_dict(file_in)
-
+    n_lines = count_lines(file_in)
+    print n_lines
     ###### create state vector ######
     gas = ct.Solution('Skeletal29_N.cti')               # argument 2
 
-    header_line = 'Points:0,Points:1,Points:2,max_eig'.split(',')
-    csv_append(header_line,test_out)
+    # header_line = 'Points:0,Points:1,Points:2,max_eig'.split(',')
+    # csv_append(header_line,test_out)
 
-    for point in range(1,100):#count_lines(file_in)):
-        big_start = t.time()
-        # Load coordinates of node i
-        coord = get_coordinates(file_in,point)
-        # Create state vector for node i
-        y = build_state_vector(file_in,gas,point)
-        # Load pressure value at node i
-        P = load_val(file_in,point,column_name['pressure'])
-        # Solve eigenvalue problem at node i
-        D, L, R = solve_jacobian(P,y)
-        max_eig = np.amax(D)
+    # for point in range(1,n_lines):#count_lines(file_in)):
+    #     big_start = t.time()
+    #     # Load coordinates of node i
+    #     coord = get_coordinates(file_in,point)
+    #     # Create state vector for node i
+    #     y = build_state_vector(file_in,gas,point)
+    #     # Load pressure value at node i
+    #     P = load_val(file_in,point,column_name['pressure'])
+    #     # Solve eigenvalue problem at node i
+    #     D, L, R = solve_jacobian(P,y)
+    #     max_eig = np.amax(D)
 
-        line_write = np.append(coord, max_eig)
-        csv_append(line_write,test_out)
+    #     line_write = np.append(coord, max_eig)
+    #     csv_append(line_write,test_out)
 
-        print t.time() - big_start, 'one loop'
-    pdb.set_trace()
+    #     print t.time() - big_start, 'one loop'
     
+    column_name = get_variable_dict(test_out)
+
+    n_lines = count_lines(test_out)
+    x_coord = np.zeros(n_lines-1)
+    CEM = np.zeros(n_lines-1)
+
+
+    
+    for point in range(1,count_lines(test_out)-1):
+        coord = get_coordinates(test_out,point)
+        x_coord[point] = coord[0]
+        CEM[point] = load_val(test_out,point,column_name['max_eig'])
+
+
+    plt.figure()
+    plt.plot(x_coord,CEM/1e6,'.')
+    plt.show()
+
+
     # point = 1 # point in space (idx)
     # # Load coordinates of node
     # coord = get_coordinates(file_in,point)

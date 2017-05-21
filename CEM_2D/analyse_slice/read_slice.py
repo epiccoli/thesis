@@ -70,5 +70,30 @@ def build_state_vector(file_in,gas,row_nb):
 
     return y
 
+def get_coordinates(file_in, row_nb):
+
+    column_name = get_variable_dict(file_in)
+
+    # Check if actually not mixed up order
+    x = load_val(file_in,row_nb,column_name['Points:0'])
+    y = load_val(file_in,row_nb,column_name['Points:1'])
+    z = load_val(file_in,row_nb,column_name['Points:2'])
+
+    return np.array([x, y, z])
+
+
+def csv_append(line, path):
+
+    with open(path, 'ab') as csv_file:
+        writer = csv.writer(csv_file, delimiter=',')
+        
+        writer.writerow(line)
+
+            # line_write.tofile('foo.csv',sep=',',format='%1.5e')
+
+
+# data = np.array([1.001012001230,2,3.0,4])
+# stromg = 'Flat,second,thri'.split(',')
+
 
 
