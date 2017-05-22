@@ -18,13 +18,16 @@ fuel_species = 'CH4'
 
 #set the gas state
 P = 101325 # Pa
-phi = 0.0133 # Most reactive mixture fraction
+phi = 1.0 # Most reactive mixture fraction
 T = 1450 # K
+
+# Eigenvalue to follow
+eig2track = -9
 
 # flame filename to store it and load it again
 flame_filename = 'saved_T={:.0f}_phi={:.4f}.xml'.format(T,phi)
 # graph filename
-graph_filename = 'CEM_fuel={}_T={:.0f}_phi={:.4f}.pdf'.format(fuel_species,T,phi)
+graph_filename = 'MODE{}_fuel={}_T={:.0f}_phi={:.4f}.pdf'.format(str(abs(eig2track)),fuel_species,T,phi)
 
 gas.set_equivalence_ratio(phi, fuel_species, 'O2:1.0, N2:3.76')
 gas.TP = T,P
@@ -50,7 +53,8 @@ print('\nmixture-averaged flamespeed = {:7f} m/s\n'.format(f.u[0]))
 ###############################################################################################
 
 ##### CEMA for the flame #####
-eig_CEM, global_expl_indices, track_species, max_eig_loc = solve_eig_flame(f,gas)
+
+eig_CEM, global_expl_indices, track_species, max_eig_loc = solve_eig_flame(f,gas,eig2track)
 
 # Check temperature profile
 # plt.figure()
@@ -75,7 +79,7 @@ ax1=plt.subplot(2,1,1)
 ax1.plot(forward_grid,np.array(CEM_fw)/1e6,linestyle='--',marker='.',label='fw tracking')
 ax1.plot(backward_grid,np.array(CEM_bw)/1e6,linestyle='--',marker='.',label='bw tracking')
 plt.legend()
-plt.title('CEM')
+plt.title('Timescale of mode {}'.format(str(abs(eig2track))))
 
 ax2 = plt.subplot(2,1,2,sharex=ax1)
 
@@ -84,9 +88,9 @@ for i in range(len(track_species)):
     ax2.plot(f.grid,global_expl_indices[track_species[i],:],linestyle='--',marker='.',label=EI_tags[track_species[i]])
 
 plt.legend()    
-plt.title('Most important EI for CEM')
+plt.title('Most important EI of mode {}'.format(str(abs(eig2track))))
 
-plt.suptitle('CEM tracked from flame front')
+plt.suptitle('Eigenvalue number {} tracked from flame front'.format(str(abs(eig2track))))
 plt.savefig(graph_filename)
 plt.show()
 

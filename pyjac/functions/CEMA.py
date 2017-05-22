@@ -80,10 +80,24 @@ def EI(D,l,r,k):
     return ab
 
 # def PI()
+def check_alignment(alignment,mac,eig2track,loc, ei_previous):
+
+    # Check good fit (other possible misfits)
+    if abs((np.sort(alignment)[-2] - np.amax(alignment)))/np.amax(alignment) < 0.01:
+        print "less than 1 perc. for eig2track {:d} at loc {:d}".format(eig2track,loc)
+        print "top two align scores : ", np.sort(alignment)[-2], np.sort(alignment)[-1], " at idx ", np.argsort(alignment)[-1]
+        print "top two mac__ scores : ", np.sort(mac)[-2], np.sort(alignment)[-1], " at idx ", np.argsort(mac)[-1]
+
+        if np.argsort(mac)[-1] == np.argsort(alignment)[-1]:
+            return 1
+        
 
 
-def solve_eig_flame(f,gas):
-    N_eig = 8# selects number of eigenvalues to store for each flame location
+
+
+
+def solve_eig_flame(f,gas, fitting, eig2track=-1):
+    N_eig = 9# selects number of eigenvalues to store for each flame location
     N_EI = 3 # number of EI species to track 
 
     T = f.T # 1D array with temperatures
@@ -95,14 +109,14 @@ def solve_eig_flame(f,gas):
 
     # STORE ALL N_eig maximum eigenvalues in all grid points
     eigenvalues = np.zeros([N_eig, grid_pts])
+    hard_points = np.zeros([grid_pts])
     # Indices species to track (with highest EI) 
     track_specs=[]      # initialised as list, then converts to np.array when using np.union1d
     # Explosive indices along all the flame
     global_expl_indices = np.zeros([n_species, grid_pts])
     # Followed by EI eigenvalue
     eig_CEM = np.empty(grid_pts)
-    # initialize maximum eig
-    max_eig = -1e3
+    
 
     # FIND HIGHEST EIGENVALUE ALONG FLAME
     for loc in range(grid_pts):
@@ -118,15 +132,18 @@ def solve_eig_flame(f,gas):
         D, L, R = LA.eig(jac, left = True)
         D = D.real
 
-        max_eig_i = np.amax(D)
+        eigenvalues[:,loc] = D[np.argsort(D)[-N_eig:]]
 
-        if max_eig_i > max_eig:
-            max_eig = max_eig_i
-            max_eig_idx = np.argmax(D)      # position of maximum eigenvalue at max eigenvalue position
-            max_eig_loc = loc
+    # position of maximum eigenvalue at max eigenvalue position
+    start_loc = np.argmax(eigenvalues[eig2track,:])
+    start_loc = np.argmax(eigenvalues[-1,:])
+
+    # if np.amax(eigenvalues[eig2track,:]) < 10:
+    #     start_loc = np.argmin(eigenvalues[eig2track,:])
+    
     
     # FORWARD FOLLOWING
-    for loc in range(max_eig_loc,grid_pts):
+    for loc in range(start_loc,grid_pts):
 
         y=np.zeros(n_species)
         y[0] = T[loc]
@@ -140,15 +157,28 @@ def solve_eig_flame(f,gas):
         D, L, R = LA.eig(jac, left = True)
         D = D.real
 
-        if loc == max_eig_loc:
-            ei_previous = EI(D,L,R,max_eig_idx)     # false previous
+        if loc == start_loc:    
+            start_eig_idx = np.argsort(D)[eig2track]
+            ei_previous = EI(D,L,R,start_eig_idx)     # false previous
 
         alignment = np.zeros(len(D))
-        
+        mac = np.zeros(len(D))
         for idx in range(len(D)):
-            alignment[idx] = parallelism(EI(D,L,R,idx), ei_previous)
+            ei_tested = EI(D,L,R,idx)
+            alignment[idx] = parallelism(ei_tested, ei_previous)
+            mac[idx] = MAC(ei_tested, ei_previous)
 
-        best_fit_idx = np.argmax(alignment)
+        # Check good fit (other possible misfits)
+        hard_points[loc] = check_alignment(alignment,mac,eig2track,loc, ei_previous)
+
+        if fitting == 'mac':
+            best_fit_idx = np.argmax(mac)
+        elif fitting == 'cos':
+            best_fit_idx = np.argmax(alignment)
+
+        # if hard_points[loc] == 1:
+        #     best_fit_idx = np.argsort(mac)[-2]
+     
         ei_current = EI(D,L,R,best_fit_idx)
 
         main_species_local = np.argsort(ei_current)[-N_EI:]
@@ -161,7 +191,7 @@ def solve_eig_flame(f,gas):
         ei_previous = ei_current
 
     # BACKWARDS FOLLOWING
-    for loc in range(max_eig_loc,-1,-1):
+    for loc in range(start_loc,-1,-1):
 
         y=np.zeros(n_species)
         y[0] = T[loc]
@@ -175,15 +205,31 @@ def solve_eig_flame(f,gas):
         D, L, R = LA.eig(jac, left = True)
         D = D.real
 
-        if loc == max_eig_loc:
-            ei_previous = EI(D,L,R,max_eig_idx)     # false previous
+        if loc == start_loc:
+            if eig2track != -1:
+                start_eig_idx = np.argsort(D)[eig2track]
+            ei_previous = EI(D,L,R,start_eig_idx)     # false previous
 
         alignment = np.zeros(len(D))
-        
+        mac = np.zeros(len(D))
         for idx in range(len(D)):
-            alignment[idx] = parallelism(EI(D,L,R,idx), ei_previous)
+            ei_tested = EI(D,L,R,idx)
+            alignment[idx] = parallelism(ei_tested, ei_previous)
+            mac[idx] = MAC(ei_tested, ei_previous)
+            
+        # Check good fit (other possible misfits)
+        hard_points[loc] = check_alignment(alignment,mac,eig2track,loc,ei_previous)
         
-        best_fit_idx = np.argmax(alignment)
+        
+        if fitting == 'mac':
+            best_fit_idx = np.argmax(mac)
+        elif fitting == 'cos':
+            best_fit_idx = np.argmax(alignment)
+
+
+        # if hard_points[loc] == 1:
+        #     best_fit_idx = np.argsort(mac)[-2]
+
         ei_current = EI(D,L,R,best_fit_idx)
 
         main_species_local = np.argsort(ei_current)[-N_EI:]
@@ -197,7 +243,9 @@ def solve_eig_flame(f,gas):
 
     track_specs=map(int,track_specs)
 
-    return eig_CEM, global_expl_indices, track_specs, max_eig_loc
+    print start_loc, 'was eig loc '
+
+    return eig_CEM, global_expl_indices, track_specs, start_loc, eigenvalues, hard_points
 
 
 def solve_eig_flame_OLD(f,gas, switch_x1, switch_x2):
@@ -479,3 +527,11 @@ def parallelism(v1,v2):
     parallelism = num/den
 
     return parallelism
+
+def MAC(v1,v2):
+
+    # Modal assurance criterion
+    num = np.power(np.dot(v1,v2),2)
+    den = np.dot(v1,v1)*np.dot(v2,v2)
+
+    return num/den 
