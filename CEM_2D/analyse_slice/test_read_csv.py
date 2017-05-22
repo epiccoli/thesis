@@ -24,33 +24,36 @@ def main():
     file_in = 'slice_test.58.csv'                       # argument 1
     file_in = 'phi1dot2_Tub320K_sL079ms_Ldomain0dot03m.csv'
     test_out = '0test_EIG_write.csv'
+    test_out = 'new_debug_flame.csv'
+
     column_name = get_variable_dict(file_in)
     n_lines = count_lines(file_in)
     print n_lines
     ###### create state vector ######
     gas = ct.Solution('Skeletal29_N.cti')               # argument 2
 
-    # header_line = 'Points:0,Points:1,Points:2,max_eig'.split(',')
-    # csv_append(header_line,test_out)
+    header_line = 'Points:0,Points:1,Points:2,max_eig'.split(',')
+    csv_append(header_line,test_out)
+    pdb.set_trace()
+    for point in range(1,n_lines):#count_lines(file_in)):
+        big_start = t.time()
+        # Load coordinates of node i
+        coord = get_coordinates(file_in,point)
+        # Create state vector for node i
+        y = build_state_vector(file_in,gas,point)
+        # Load pressure value at node i
+        P = load_val(file_in,point,column_name['pressure'])
+        # Solve eigenvalue problem at node i
+        D, L, R = solve_jacobian(P,y)
+        max_eig = np.amax(D)
 
-    # for point in range(1,n_lines):#count_lines(file_in)):
-    #     big_start = t.time()
-    #     # Load coordinates of node i
-    #     coord = get_coordinates(file_in,point)
-    #     # Create state vector for node i
-    #     y = build_state_vector(file_in,gas,point)
-    #     # Load pressure value at node i
-    #     P = load_val(file_in,point,column_name['pressure'])
-    #     # Solve eigenvalue problem at node i
-    #     D, L, R = solve_jacobian(P,y)
-    #     max_eig = np.amax(D)
+        line_write = np.append(coord, max_eig)
+        csv_append(line_write,test_out)
 
-    #     line_write = np.append(coord, max_eig)
-    #     csv_append(line_write,test_out)
-
-    #     print t.time() - big_start, 'one loop'
+        print t.time() - big_start, 'one loop'
     
     column_name = get_variable_dict(test_out)
+    pdb.set_trace()
 
     n_lines = count_lines(test_out)
     x_coord = np.zeros(n_lines-1)

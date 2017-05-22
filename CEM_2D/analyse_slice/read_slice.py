@@ -65,8 +65,8 @@ def build_state_vector(file_in,gas,row_nb):
         try:
             y[i] = load_val(file_in, row_nb, variable[phi[i]])
         except KeyError:
-            # print('still need to extract those values of QSS')   
-            pass
+            print('still need to extract those values of QSS')   
+            
 
     return y
 
