@@ -22,19 +22,52 @@ import matplotlib.pyplot as plt
 
 def main():
     file_in = 'slice_test.58.csv'                       # argument 1
-    file_in = 'phi1dot2_Tub320K_sL079ms_Ldomain0dot03m.csv'
+    # file_in = 'phi1dot2_Tub320K_sL079ms_Ldomain0dot03m.csv'
     test_out = '0test_EIG_write.csv'
-    test_out = 'new_debug_flame.csv'
+    # test_out = 'new_debug_flame.csv'
 
-    column_name = get_variable_dict(file_in)
-    n_lines = count_lines(file_in)
-    print n_lines
-    ###### create state vector ######
-    gas = ct.Solution('Skeletal29_N.cti')               # argument 2
 
-    header_line = 'Points:0,Points:1,Points:2,max_eig'.split(',')
-    csv_append(header_line,test_out)
+
+    with open(file_in,'rb') as f:
+        start = t.time()
+        reader = list(csv.reader(f))
+        print('Read whole file: {:.6f} seconds'.format(t.time()-start))
+        
+
+        column_name = get_variable_dict(reader)
+    
+        n_lines = count_lines(reader)
+        
+        ###### create state vector ######
+        gas = ct.Solution('Skeletal29_N.cti')               # argument 2
+
+        header_line = 'Points:0,Points:1,Points:2,max_eig'.split(',')
+        csv_append(header_line,test_out)
+        
+
+
+        for point in range(1,n_lines):#count_lines(file_in)):
+
+            big_start = t.time()
+            # Load coordinates of node i
+            coord = get_coordinates(reader,point,column_name)
+            
+            # Create state vector for node i
+            y = build_state_vector(reader,gas,point)
+            # Load pressure value at node i
+            P = load_val(reader,point,column_name['pressure'])
+            # Solve eigenvalue problem at node i
+            D, L, R = solve_jacobian(P,y)
+            max_eig = np.amax(D)
+
+            line_write = np.append(coord, max_eig)
+            csv_append(line_write,test_out)
+
+            print t.time() - big_start, 'one loop'
+
+    print " THE END"
     pdb.set_trace()
+
     for point in range(1,n_lines):#count_lines(file_in)):
         big_start = t.time()
         # Load coordinates of node i

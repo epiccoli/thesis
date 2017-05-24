@@ -23,7 +23,7 @@ T = 1100 # K
 
 # Eigenvalue to follow
 # eig2track = - # 0 for maximum eig
-fitting = 'mac'
+fitting = 'cos'
 
 # flame filename to store it and load it again
 flame_filename = 'saved_T={:.0f}_phi={:.4f}.xml'.format(T,phi)

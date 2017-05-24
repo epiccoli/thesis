@@ -84,9 +84,9 @@ def check_alignment(alignment,mac,eig2track,loc, ei_previous):
 
     # Check good fit (other possible misfits)
     if abs((np.sort(alignment)[-2] - np.amax(alignment)))/np.amax(alignment) < 0.01:
-        print "less than 1 perc. for eig2track {:d} at loc {:d}".format(eig2track,loc)
-        print "top two align scores : ", np.sort(alignment)[-2], np.sort(alignment)[-1], " at idx ", np.argsort(alignment)[-1]
-        print "top two mac__ scores : ", np.sort(mac)[-2], np.sort(alignment)[-1], " at idx ", np.argsort(mac)[-1]
+        # print "less than 1 perc. for eig2track {:d} at loc {:d}".format(eig2track,loc)
+        # print "top two align scores : ", np.sort(alignment)[-2], np.sort(alignment)[-1], " at idx ", np.argsort(alignment)[-1]
+        # print "top two mac__ scores : ", np.sort(mac)[-2], np.sort(alignment)[-1], " at idx ", np.argsort(mac)[-1]
 
         if np.argsort(mac)[-1] == np.argsort(alignment)[-1]:
             return 1
@@ -133,6 +133,21 @@ def solve_eig_flame(f,gas, fitting, eig2track=-1):
         D = D.real
 
         eigenvalues[:,loc] = D[np.argsort(D)[-N_eig:]]
+        
+    #     if loc%10 == 0:
+    #         # pdb.set_trace()
+            
+    #         vec4 = R[:,np.argsort(D)[-3]]
+    #         fig, ax = plt.subplots()
+    #         ax.plot(vec4,'x')
+    #         plt.xlabel('vector component number')
+    #         ax.set_xticks(range(len(vec4)))
+    #         ax.set_xticklabels(['T','H2','O2','H2O','H','O','OH','HO2','H2O2','AR','HE','CO','CO2'])            
+    #         # plt.show()
+    #         fig_name = 'right_eig_loc{:d}.pdf'.format(loc)
+    #         plt.savefig(fig_name)
+    #         plt.cla()
+    # plt.close()
 
     # position of maximum eigenvalue at max eigenvalue position
     start_loc = np.argmax(eigenvalues[eig2track,:])
@@ -147,7 +162,7 @@ def solve_eig_flame(f,gas, fitting, eig2track=-1):
 
         y=np.zeros(n_species)
         y[0] = T[loc]
-        # find the position of N2 species
+        # find the position of N2 species --> careful: it must be the first spec in mech before AR HE
         N2_idx = gas.species_index('N2')
         y_massfr = np.concatenate([Y[0:N2_idx,loc], Y[N2_idx+1:,loc]])
         y[1:] = y_massfr
@@ -160,6 +175,7 @@ def solve_eig_flame(f,gas, fitting, eig2track=-1):
         if loc == start_loc:    
             start_eig_idx = np.argsort(D)[eig2track]
             ei_previous = EI(D,L,R,start_eig_idx)     # false previous
+            
 
         alignment = np.zeros(len(D))
         mac = np.zeros(len(D))
@@ -243,7 +259,7 @@ def solve_eig_flame(f,gas, fitting, eig2track=-1):
 
     track_specs=map(int,track_specs)
 
-    print start_loc, 'was eig loc '
+    print start_loc, 'was start loc '
 
     return eig_CEM, global_expl_indices, track_specs, start_loc, eigenvalues, hard_points
 

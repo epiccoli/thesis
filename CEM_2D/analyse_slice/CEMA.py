@@ -9,7 +9,7 @@ def solve_eig_gas(gas):
 
 
     # input arg: gas cantera object
-    # output arg: eigenvalue vector, left and right eigenvector matrices 
+    # output arg: eigenvalue vector, left and right eigenvector matrices [column vectors]
 
     T = gas.T
     P = gas.P
