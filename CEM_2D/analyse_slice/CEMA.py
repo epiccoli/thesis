@@ -5,6 +5,9 @@ import cantera as ct
 import pdb
 import matplotlib.pyplot as plt
 
+
+
+
 def solve_eig_gas(gas):
 
 
@@ -354,6 +357,36 @@ def create_jacobian(T,P,y):
     jac = jac.reshape(n_species,n_species)
 
     return jac
+
+def build_state_df(df_row,state_vec_keys):
+    # df_row is one row of dataframe, state_vec_keys contains the headers of interest for the state vector
+
+    n_species = len(state_vec_keys)
+    # fill the state vector y with values from 
+    y = np.zeros(n_species)
+    for i in range(n_species):
+        try:
+            y[i] = df_row[state_vec_keys[i]]
+
+            if y[i] < 0:
+                y[i] = 0
+        
+        except KeyError:
+            print('Data column {} not found in csv'.format(state_keys[i]))   
+            pass
+            
+
+    return y
+
+def eig_line(df_row,state_vec_keys):
+
+    y = build_state_df(df_row,state_vec_keys)
+    P = df_row['pressure']
+
+    # Solve eigenvalue problem 
+    D, L, R = solve_jacobian(P,y)
+
+    return D, L, R 
 
 def solve_jacobian(P,y):
 

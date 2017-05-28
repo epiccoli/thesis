@@ -5,6 +5,27 @@ import time as t
 import cantera as ct
 import scipy.linalg as LA
 
+def analyse_df(pandas_df,state_vec_keys):
+    
+    max_eig = np.zeros(pandas_df.shape[0])
+
+    for i in xrange(pandas_df.shape[0]):
+
+        start = t.time()                # time
+
+        D, L, R = eig_line(pandas_df.iloc[i],state_vec_keys)
+
+        max_eig[i] = np.amax(D)
+
+        stop += t.time() - start        # time
+        if i % 50 == 0:                 # time
+            print('Process 50 lines {:.4f} seconds'.format(stop))   # time
+            stop = 0                                                # time
+
+    pandas_df['max_eig'] = max_eig
+
+    return pandas_df
+
 def load_row_IO(file_in,row_nb):
     # returns only line number "row_nb" of "file_in"
     with open(file_in,'rb') as f:   # suggested to open in binary mode
@@ -78,6 +99,8 @@ def get_state_vec_keys(gas):
         if gas.species_name(i) != 'N2':
             phi.append(gas.species_name(i))
     return phi
+
+
 
 def build_state_vector(current_row,state_keys,column_name):
     # y is state vector for jacobian calculation
